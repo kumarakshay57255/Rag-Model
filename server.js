@@ -20,7 +20,8 @@ const PORT = 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static('public'));
 
 // Configure file upload
@@ -56,7 +57,10 @@ const upload = multer({
             cb(new Error('Unsupported file type! Supported: PDF, CSV, JSON, TXT, MD'), false);
         }
     },
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+    limits: { 
+        fileSize: 100 * 1024 * 1024, // 100MB limit
+        fieldSize: 100 * 1024 * 1024  // 100MB field size
+    }
 });
 
 // Global embedding model (cached)
