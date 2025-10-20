@@ -37,16 +37,43 @@
         <div class="main-grid">
             <!-- Upload Section -->
             <section class="upload-section">
-                <h2>📤 Upload Documents</h2>
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📁</div>
-                    <p class="upload-text">Drag & drop PDF files here</p>
-                    <p class="upload-subtext">or</p>
-                    <label for="fileInput" class="upload-button">
-                        Choose File
-                    </label>
-                    <input type="file" id="fileInput" accept=".pdf" style="display: none;">
-                    <p class="upload-info">Maximum file size: 10MB</p>
+                <h2>📤 Upload Content</h2>
+                
+                <!-- Tab Buttons -->
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="file">📁 Upload File</button>
+                    <button class="tab-button" data-tab="url">🌐 Load URL</button>
+                </div>
+
+                <!-- File Upload Tab -->
+                <div id="fileTab" class="tab-content active">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-text">Drag & drop files here</p>
+                        <p class="upload-subtext">Supports: PDF, CSV, JSON, TXT, MD</p>
+                        <label for="fileInput" class="upload-button">
+                            Choose File
+                        </label>
+                        <input type="file" id="fileInput" accept=".pdf,.csv,.json,.txt,.md" style="display: none;">
+                        <p class="upload-info">Maximum file size: 10MB</p>
+                    </div>
+                </div>
+
+                <!-- URL Input Tab -->
+                <div id="urlTab" class="tab-content">
+                    <div class="url-input-area">
+                        <label for="urlInput">Enter Website URL:</label>
+                        <input 
+                            type="url" 
+                            id="urlInput" 
+                            placeholder="https://example.com/article" 
+                            class="url-input"
+                        >
+                        <button id="processUrlButton" class="upload-button">
+                            🌐 Load Webpage
+                        </button>
+                        <p class="upload-info">Load content from any public webpage</p>
+                    </div>
                 </div>
 
                 <div id="uploadProgress" class="upload-progress" style="display: none;">
@@ -60,12 +87,12 @@
 
                 <!-- Uploaded Files List -->
                 <div class="files-list">
-                    <h3>📚 Uploaded Documents</h3>
+                    <h3>📚 Processed Sources</h3>
                     <div id="filesList" class="files-container">
-                        <p class="empty-state">No documents uploaded yet</p>
+                        <p class="empty-state">No sources processed yet</p>
                     </div>
                     <button class="clear-button" id="clearButton" style="display: none;">
-                        🗑️ Clear All Documents
+                        🗑️ Clear All Sources
                     </button>
                 </div>
             </section>

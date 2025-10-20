@@ -9,6 +9,7 @@ import { pipeline } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { loadWebPage, loadCSV, loadJSON, loadTextFile, splitDocuments } from './documentLoaders.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,10 +41,19 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/pdf') {
+        const allowedTypes = [
+            'application/pdf',
+            'text/csv',
+            'application/json',
+            'text/plain',
+            'text/markdown',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only PDF files are allowed!'), false);
+            cb(new Error('Unsupported file type! Supported: PDF, CSV, JSON, TXT, MD'), false);
         }
     },
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
@@ -143,7 +153,7 @@ app.get('/api/stats', (req, res) => {
     }
 });
 
-// Upload and process PDF
+// Upload and process files (PDF, CSV, JSON, TXT)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -152,17 +162,35 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
         console.log(`Processing file: ${req.file.originalname}`);
 
-        // Load PDF
-        const loader = new PDFLoader(req.file.path);
-        const docs = await loader.load();
-        console.log(`✓ Loaded ${docs.length} pages`);
+        let docs;
+        const fileExtension = path.extname(req.file.originalname).toLowerCase();
+
+        // Load document based on file type
+        switch (fileExtension) {
+            case '.pdf':
+                const pdfLoader = new PDFLoader(req.file.path);
+                docs = await pdfLoader.load();
+                console.log(`✓ Loaded ${docs.length} pages from PDF`);
+                break;
+            case '.csv':
+                docs = await loadCSV(req.file.path);
+                console.log(`✓ Loaded ${docs.length} rows from CSV`);
+                break;
+            case '.json':
+                docs = await loadJSON(req.file.path);
+                console.log(`✓ Loaded ${docs.length} items from JSON`);
+                break;
+            case '.txt':
+            case '.md':
+                docs = await loadTextFile(req.file.path);
+                console.log(`✓ Loaded text file`);
+                break;
+            default:
+                return res.status(400).json({ error: `Unsupported file type: ${fileExtension}` });
+        }
 
         // Split into chunks
-        const textSplitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 1000,
-            chunkOverlap: 200,
-        });
-        const splitDocs = await textSplitter.splitDocuments(docs);
+        const splitDocs = await splitDocuments(docs, 1000, 200);
         console.log(`✓ Created ${splitDocs.length} chunks`);
 
         // Get embedding model
@@ -181,6 +209,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                 metadata: {
                     ...doc.metadata,
                     originalName: req.file.originalname,
+                    fileType: fileExtension,
                     uploadedAt: new Date().toISOString()
                 },
                 chunkIndex: i
@@ -206,8 +235,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         // Add new embeddings
         vectorStore.embeddings.push(...documentEmbeddings);
         vectorStore.metadata.totalChunks = vectorStore.embeddings.length;
-        vectorStore.metadata.sourceFiles.push(req.file.originalname);
-        vectorStore.metadata.sourceFiles = [...new Set(vectorStore.metadata.sourceFiles)];
+        vectorStore.metadata.sourceFiles.push({
+            name: req.file.originalname,
+            type: fileExtension,
+            uploadedAt: new Date().toISOString()
+        });
 
         // Save vector store
         saveVectorStore(vectorStore);
@@ -217,13 +249,104 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             success: true,
             message: 'File processed successfully',
             filename: req.file.originalname,
-            pages: docs.length,
+            fileType: fileExtension,
+            documents: docs.length,
             chunks: splitDocs.length,
             totalChunks: vectorStore.metadata.totalChunks
         });
 
     } catch (error) {
         console.error('Upload error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Process URL endpoint
+app.post('/api/process-url', async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        // Validate URL
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            return res.status(400).json({ error: 'Invalid URL. Must start with http:// or https://' });
+        }
+
+        console.log(`Processing URL: ${url}`);
+
+        // Load webpage content
+        const docs = await loadWebPage(url);
+        console.log(`✓ Loaded content from ${url}`);
+
+        // Split into chunks
+        const splitDocs = await splitDocuments(docs, 1000, 200);
+        console.log(`✓ Created ${splitDocs.length} chunks`);
+
+        // Get embedding model
+        const model = await getEmbeddingModel();
+
+        // Create embeddings
+        const documentEmbeddings = [];
+        for (let i = 0; i < splitDocs.length; i++) {
+            const doc = splitDocs[i];
+            const output = await model(doc.pageContent, { pooling: 'mean', normalize: true });
+            const embedding = Array.from(output.data);
+
+            documentEmbeddings.push({
+                content: doc.pageContent,
+                embedding: embedding,
+                metadata: {
+                    ...doc.metadata,
+                    source: url,
+                    sourceType: 'url',
+                    uploadedAt: new Date().toISOString()
+                },
+                chunkIndex: i
+            });
+        }
+        console.log(`✓ Created embeddings for ${documentEmbeddings.length} chunks`);
+
+        // Load existing vector store or create new one
+        let vectorStore = loadVectorStore();
+        if (!vectorStore) {
+            vectorStore = {
+                embeddings: [],
+                metadata: {
+                    totalChunks: 0,
+                    dimensions: 384,
+                    model: 'Xenova/all-MiniLM-L6-v2',
+                    createdAt: new Date().toISOString(),
+                    sourceFiles: []
+                }
+            };
+        }
+
+        // Add new embeddings
+        vectorStore.embeddings.push(...documentEmbeddings);
+        vectorStore.metadata.totalChunks = vectorStore.embeddings.length;
+        vectorStore.metadata.sourceFiles.push({
+            name: url,
+            type: 'url',
+            uploadedAt: new Date().toISOString()
+        });
+
+        // Save vector store
+        saveVectorStore(vectorStore);
+        console.log(`✓ Vector store updated`);
+
+        res.json({
+            success: true,
+            message: 'URL processed successfully',
+            url: url,
+            chunks: splitDocs.length,
+            totalChunks: vectorStore.metadata.totalChunks
+        });
+
+    } catch (error) {
+        console.error('URL processing error:', error);
         res.status(500).json({ error: error.message });
     }
 });
