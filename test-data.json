@@ -1,0 +1,21 @@
+{
+  "tutorials": [
+    {
+      "title": "Getting Started with Python",
+      "content": "Python is a high-level, interpreted programming language known for its simplicity and readability. It's widely used in web development, data science, automation, and AI."
+    },
+    {
+      "title": "JavaScript Fundamentals",
+      "content": "JavaScript is a versatile programming language that runs in web browsers and on servers via Node.js. It's essential for modern web development and full-stack applications."
+    },
+    {
+      "title": "Introduction to React",
+      "content": "React is a popular JavaScript library for building user interfaces. It uses a component-based architecture and virtual DOM for efficient rendering."
+    }
+  ],
+  "concepts": {
+    "variables": "Variables store data values. In most programming languages, you declare variables with keywords like var, let, or const.",
+    "functions": "Functions are reusable blocks of code that perform specific tasks. They help organize code and avoid repetition.",
+    "loops": "Loops execute code repeatedly based on conditions. Common types include for loops, while loops, and forEach methods."
+  }
+}

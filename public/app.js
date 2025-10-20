@@ -14,6 +14,13 @@ const queryInput = document.getElementById('queryInput');
 const queryButton = document.getElementById('queryButton');
 const queryResults = document.getElementById('queryResults');
 const topKSelect = document.getElementById('topK');
+const urlInput = document.getElementById('urlInput');
+const processUrlButton = document.getElementById('processUrlButton');
+
+// Tab elements
+const tabButtons = document.querySelectorAll('.tab-button');
+const fileTab = document.getElementById('fileTab');
+const urlTab = document.getElementById('urlTab');
 
 // Stats elements
 const totalDocsEl = document.getElementById('totalDocs');
@@ -27,6 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Setup Event Listeners
 function setupEventListeners() {
+    // Tab switching
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            switchTab(tabName);
+        });
+    });
+
     // File input
     fileInput.addEventListener('change', handleFileSelect);
 
@@ -35,6 +50,14 @@ function setupEventListeners() {
     uploadArea.addEventListener('dragover', handleDragOver);
     uploadArea.addEventListener('dragleave', handleDragLeave);
     uploadArea.addEventListener('drop', handleDrop);
+
+    // URL processing
+    processUrlButton.addEventListener('click', handleUrlProcess);
+    urlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            handleUrlProcess();
+        }
+    });
 
     // Query
     queryButton.addEventListener('click', handleQuery);
@@ -46,6 +69,27 @@ function setupEventListeners() {
 
     // Clear button
     clearButton.addEventListener('click', handleClear);
+}
+
+// Switch Tabs
+function switchTab(tabName) {
+    // Update buttons
+    tabButtons.forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update content
+    if (tabName === 'file') {
+        fileTab.classList.add('active');
+        urlTab.classList.remove('active');
+    } else if (tabName === 'url') {
+        urlTab.classList.add('active');
+        fileTab.classList.remove('active');
+    }
 }
 
 // Load Statistics
@@ -62,7 +106,7 @@ async function loadStats() {
             displayFilesList(data.files);
             clearButton.style.display = 'block';
         } else {
-            filesList.innerHTML = '<p class="empty-state">No documents uploaded yet</p>';
+            filesList.innerHTML = '<p class="empty-state">No sources processed yet</p>';
             clearButton.style.display = 'none';
         }
     } catch (error) {
@@ -72,14 +116,35 @@ async function loadStats() {
 
 // Display Files List
 function displayFilesList(files) {
-    filesList.innerHTML = files.map(file => `
-        <div class="file-item">
-            <div class="file-icon">📄</div>
-            <div class="file-info">
-                <div class="file-name">${file}</div>
+    filesList.innerHTML = files.map(file => {
+        // Handle both string (old format) and object (new format)
+        const fileName = typeof file === 'string' ? file : file.name;
+        const fileType = typeof file === 'string' ? 'file' : file.type;
+        const icon = fileType === 'url' ? '🌐' : getFileIcon(fileName);
+        
+        return `
+            <div class="file-item">
+                <div class="file-icon">${icon}</div>
+                <div class="file-info">
+                    <div class="file-name">${fileName}</div>
+                    ${fileType === 'url' ? '<div class="file-type">Webpage</div>' : ''}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+// Get file icon based on extension
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'pdf': '📄',
+        'csv': '📊',
+        'json': '📋',
+        'txt': '📝',
+        'md': '📝'
+    };
+    return icons[ext] || '📁';
 }
 
 // Handle File Select
@@ -108,10 +173,12 @@ function handleDrop(e) {
     uploadArea.classList.remove('drag-over');
 
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
+    const validTypes = ['application/pdf', 'text/csv', 'application/json', 'text/plain', 'text/markdown'];
+    
+    if (file && validTypes.includes(file.type)) {
         uploadFile(file);
     } else {
-        showAlert('Please drop a PDF file', 'error');
+        showAlert('Please drop a supported file (PDF, CSV, JSON, TXT, MD)', 'error');
     }
 }
 
@@ -143,10 +210,11 @@ async function uploadFile(file) {
         if (response.ok) {
             setTimeout(() => {
                 uploadProgress.style.display = 'none';
+                const fileTypeLabel = data.fileType === '.pdf' ? 'Pages' : 'Documents';
                 showAlert(`
                     <strong>✓ Success!</strong><br>
                     File: ${data.filename}<br>
-                    Pages: ${data.pages}<br>
+                    ${data.documents ? `${fileTypeLabel}: ${data.documents}<br>` : ''}
                     Chunks: ${data.chunks}<br>
                     Total Chunks in DB: ${data.totalChunks}
                 `, 'success');
@@ -160,6 +228,68 @@ async function uploadFile(file) {
     } catch (error) {
         uploadProgress.style.display = 'none';
         showAlert(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Handle URL Process
+async function handleUrlProcess() {
+    const url = urlInput.value.trim();
+
+    if (!url) {
+        showAlert('Please enter a URL', 'error');
+        return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        showAlert('Please enter a valid URL starting with http:// or https://', 'error');
+        return;
+    }
+
+    // Show progress
+    uploadProgress.style.display = 'block';
+    progressFill.style.width = '30%';
+    progressText.textContent = 'Loading webpage...';
+    uploadResult.innerHTML = '';
+    processUrlButton.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/process-url`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url })
+        });
+
+        progressFill.style.width = '60%';
+        progressText.textContent = 'Processing content...';
+
+        const data = await response.json();
+
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Creating embeddings...';
+
+        if (response.ok) {
+            setTimeout(() => {
+                uploadProgress.style.display = 'none';
+                showAlert(`
+                    <strong>✓ Success!</strong><br>
+                    URL: ${data.url}<br>
+                    Chunks: ${data.chunks}<br>
+                    Total Chunks in DB: ${data.totalChunks}
+                `, 'success');
+                loadStats();
+                urlInput.value = '';
+                processUrlButton.disabled = false;
+            }, 500);
+        } else {
+            throw new Error(data.error || 'URL processing failed');
+        }
+
+    } catch (error) {
+        uploadProgress.style.display = 'none';
+        showAlert(`Error: ${error.message}`, 'error');
+        processUrlButton.disabled = false;
     }
 }
 

@@ -1,0 +1,7 @@
+Title,Category,Description,Keywords
+Machine Learning Basics,AI,Introduction to machine learning concepts and algorithms,machine learning; AI; algorithms; supervised learning
+Natural Language Processing,AI,Understanding how computers process human language,NLP; text processing; language models; tokenization
+Deep Learning Fundamentals,AI,Neural networks and deep learning architectures,deep learning; neural networks; CNN; RNN; transformers
+Data Science Tools,Data,Popular tools and frameworks for data science,Python; Pandas; NumPy; Matplotlib; Jupyter
+Cloud Computing,Infrastructure,Overview of cloud platforms and services,AWS; Azure; GCP; cloud services; serverless
+Version Control,Development,Git and GitHub best practices,Git; GitHub; version control; branching; merging

@@ -1,0 +1,188 @@
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
+import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import path from 'path';
+import fs from 'fs';
+
+/**
+ * Load documents from a PDF file
+ */
+export async function loadPDF(filePath) {
+    console.log(`📄 Loading PDF: ${filePath}`);
+    const loader = new PDFLoader(filePath);
+    const docs = await loader.load();
+    console.log(`✓ Loaded ${docs.length} pages from PDF`);
+    return docs;
+}
+
+/**
+ * Load documents from a website URL using Playwright
+ */
+export async function loadWebPage(url) {
+    console.log(`🌐 Loading webpage: ${url}`);
+    const loader = new PlaywrightWebBaseLoader(url, {
+        launchOptions: {
+            headless: true,
+        },
+        gotoOptions: {
+            waitUntil: "domcontentloaded",
+        },
+        evaluateOptions: {
+            waitForSelector: "body",
+        }
+    });
+    
+    const docs = await loader.load();
+    console.log(`✓ Loaded content from ${url}`);
+    return docs;
+}
+
+/**
+ * Load documents from a CSV file
+ */
+export async function loadCSV(filePath) {
+    console.log(`📊 Loading CSV: ${filePath}`);
+    const loader = new CSVLoader(filePath);
+    const docs = await loader.load();
+    console.log(`✓ Loaded ${docs.length} rows from CSV`);
+    return docs;
+}
+
+/**
+ * Load documents from a JSON file
+ */
+export async function loadJSON(filePath) {
+    console.log(`📋 Loading JSON: ${filePath}`);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const jsonData = JSON.parse(content);
+    
+    let docs = [];
+    
+    // Handle array of objects
+    if (Array.isArray(jsonData)) {
+        docs = jsonData.map((item, index) => ({
+            pageContent: typeof item === 'string' ? item : JSON.stringify(item, null, 2),
+            metadata: {
+                source: filePath,
+                line: index + 1,
+                type: 'json'
+            }
+        }));
+    } 
+    // Handle single object
+    else if (typeof jsonData === 'object') {
+        // Convert object properties to documents
+        for (const [key, value] of Object.entries(jsonData)) {
+            docs.push({
+                pageContent: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+                metadata: {
+                    source: filePath,
+                    key: key,
+                    type: 'json'
+                }
+            });
+        }
+    }
+    // Handle simple string/number
+    else {
+        docs = [{
+            pageContent: String(jsonData),
+            metadata: {
+                source: filePath,
+                type: 'json'
+            }
+        }];
+    }
+    
+    console.log(`✓ Loaded ${docs.length} items from JSON`);
+    return docs;
+}
+
+/**
+ * Load documents from a text file
+ */
+export async function loadTextFile(filePath) {
+    console.log(`📝 Loading text file: ${filePath}`);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const docs = [{
+        pageContent: content,
+        metadata: {
+            source: filePath,
+            type: 'text'
+        }
+    }];
+    console.log(`✓ Loaded text file`);
+    return docs;
+}
+
+/**
+ * Detect file type and load accordingly
+ */
+export async function loadDocument(input) {
+    // Check if input is a URL
+    if (input.startsWith('http://') || input.startsWith('https://')) {
+        return await loadWebPage(input);
+    }
+
+    // Check if input is a file path
+    const ext = path.extname(input).toLowerCase();
+    
+    switch (ext) {
+        case '.pdf':
+            return await loadPDF(input);
+        case '.csv':
+            return await loadCSV(input);
+        case '.json':
+            return await loadJSON(input);
+        case '.txt':
+        case '.md':
+            return await loadTextFile(input);
+        default:
+            throw new Error(`Unsupported file type: ${ext}. Supported types: .pdf, .csv, .json, .txt, .md, or URLs`);
+    }
+}
+
+/**
+ * Split documents into chunks
+ */
+export async function splitDocuments(docs, chunkSize = 1000, chunkOverlap = 200) {
+    console.log(`✂️  Splitting ${docs.length} documents into chunks...`);
+    const textSplitter = new RecursiveCharacterTextSplitter({
+        chunkSize,
+        chunkOverlap,
+    });
+    
+    const chunks = await textSplitter.splitDocuments(docs);
+    console.log(`✓ Created ${chunks.length} chunks`);
+    return chunks;
+}
+
+/**
+ * Process any input (file or URL) - load and split into chunks
+ */
+export async function processInput(input, chunkSize = 1000, chunkOverlap = 200) {
+    try {
+        // Load documents
+        const docs = await loadDocument(input);
+        
+        // Split into chunks
+        const chunks = await splitDocuments(docs, chunkSize, chunkOverlap);
+        
+        return {
+            success: true,
+            chunks,
+            metadata: {
+                source: input,
+                totalDocuments: docs.length,
+                totalChunks: chunks.length
+            }
+        };
+    } catch (error) {
+        console.error(`❌ Error processing input: ${error.message}`);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}

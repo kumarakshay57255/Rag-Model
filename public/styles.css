@@ -172,6 +172,79 @@ body {
     color: var(--text-secondary);
 }
 
+/* Tab Buttons */
+.tab-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 20px;
+    background: var(--border-color);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    color: var(--text-secondary);
+}
+
+.tab-button.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-weight: 500;
+}
+
+.tab-button:hover:not(.active) {
+    background: var(--card-bg);
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* URL Input */
+.url-input-area {
+    padding: 30px;
+    background: var(--background);
+    border-radius: 12px;
+    border: 2px dashed var(--border-color);
+}
+
+.url-input-area label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.url-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    transition: border-color 0.3s;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.url-input-area .upload-button {
+    width: 100%;
+    text-align: center;
+}
+
 /* Upload Progress */
 .upload-progress {
     margin-top: 20px;
