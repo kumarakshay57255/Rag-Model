@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Document System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🚀 RAG Document System</h1>
+            <p class="subtitle">Upload documents, create embeddings, and query your knowledge base</p>
+        </header>
+
+        <!-- Stats Section -->
+        <section class="stats-section">
+            <div class="stat-card">
+                <div class="stat-icon">📄</div>
+                <div class="stat-value" id="totalDocs">0</div>
+                <div class="stat-label">Documents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📦</div>
+                <div class="stat-value" id="totalChunks">0</div>
+                <div class="stat-label">Chunks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🤖</div>
+                <div class="stat-value">384D</div>
+                <div class="stat-label">Vector Size</div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <div class="main-grid">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <h2>📤 Upload Documents</h2>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p class="upload-text">Drag & drop PDF files here</p>
+                    <p class="upload-subtext">or</p>
+                    <label for="fileInput" class="upload-button">
+                        Choose File
+                    </label>
+                    <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                    <p class="upload-info">Maximum file size: 10MB</p>
+                </div>
+
+                <div id="uploadProgress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">Processing...</p>
+                </div>
+
+                <div id="uploadResult" class="upload-result"></div>
+
+                <!-- Uploaded Files List -->
+                <div class="files-list">
+                    <h3>📚 Uploaded Documents</h3>
+                    <div id="filesList" class="files-container">
+                        <p class="empty-state">No documents uploaded yet</p>
+                    </div>
+                    <button class="clear-button" id="clearButton" style="display: none;">
+                        🗑️ Clear All Documents
+                    </button>
+                </div>
+            </section>
+
+            <!-- Query Section -->
+            <section class="query-section">
+                <h2>🔍 Query Documents</h2>
+                <div class="query-input-area">
+                    <textarea 
+                        id="queryInput" 
+                        placeholder="Ask a question about your documents...&#10;Example: What is this document about?"
+                        rows="4"
+                    ></textarea>
+                    <div class="query-controls">
+                        <label for="topK">Top Results:</label>
+                        <select id="topK">
+                            <option value="3" selected>3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                        </select>
+                        <label style="margin-left: 20px; display: flex; align-items: center;">
+                            <input type="checkbox" id="useAI" style="margin-right: 8px;">
+                            <span>🤖 AI Answer (Google Gemini)</span>
+                        </label>
+                        <button id="queryButton" class="query-button">
+                            Search 🔍
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Query Results -->
+                <div id="queryResults" class="query-results">
+                    <div class="empty-state">
+                        <div class="empty-icon">💭</div>
+                        <p>Enter a query to search your documents</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
