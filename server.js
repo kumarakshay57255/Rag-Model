@@ -57,7 +57,7 @@ const upload = multer({
             cb(new Error('Unsupported file type! Supported: PDF, CSV, JSON, TXT, MD'), false);
         }
     },
-    limits: { 
+    limits: {
         fileSize: 100 * 1024 * 1024, // 100MB limit
         fieldSize: 100 * 1024 * 1024  // 100MB field size
     }

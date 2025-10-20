@@ -32,7 +32,7 @@ export async function loadWebPage(url) {
             waitForSelector: "body",
         }
     });
-    
+
     const docs = await loader.load();
     console.log(`✓ Loaded content from ${url}`);
     return docs;
@@ -56,9 +56,9 @@ export async function loadJSON(filePath) {
     console.log(`📋 Loading JSON: ${filePath}`);
     const content = fs.readFileSync(filePath, 'utf-8');
     const jsonData = JSON.parse(content);
-    
+
     let docs = [];
-    
+
     // Handle array of objects
     if (Array.isArray(jsonData)) {
         docs = jsonData.map((item, index) => ({
@@ -69,7 +69,7 @@ export async function loadJSON(filePath) {
                 type: 'json'
             }
         }));
-    } 
+    }
     // Handle single object
     else if (typeof jsonData === 'object') {
         // Convert object properties to documents
@@ -94,7 +94,7 @@ export async function loadJSON(filePath) {
             }
         }];
     }
-    
+
     console.log(`✓ Loaded ${docs.length} items from JSON`);
     return docs;
 }
@@ -127,7 +127,7 @@ export async function loadDocument(input) {
 
     // Check if input is a file path
     const ext = path.extname(input).toLowerCase();
-    
+
     switch (ext) {
         case '.pdf':
             return await loadPDF(input);
@@ -152,7 +152,7 @@ export async function splitDocuments(docs, chunkSize = 1000, chunkOverlap = 200)
         chunkSize,
         chunkOverlap,
     });
-    
+
     const chunks = await textSplitter.splitDocuments(docs);
     console.log(`✓ Created ${chunks.length} chunks`);
     return chunks;
@@ -165,10 +165,10 @@ export async function processInput(input, chunkSize = 1000, chunkOverlap = 200) 
     try {
         // Load documents
         const docs = await loadDocument(input);
-        
+
         // Split into chunks
         const chunks = await splitDocuments(docs, chunkSize, chunkOverlap);
-        
+
         return {
             success: true,
             chunks,

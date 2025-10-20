@@ -8,6 +8,7 @@
 ## 🎯 Test Steps
 
 ### Test 1: Upload PDF
+
 1. Open http://localhost:3000
 2. Click "Upload File" tab
 3. Drag and drop your PDF or click "Choose File"
@@ -15,6 +16,7 @@
 5. ✅ You should see: "Success! File: [filename], Chunks: X"
 
 ### Test 2: Load Webpage
+
 1. Click "Load URL" tab
 2. Try these URLs:
    - `https://en.wikipedia.org/wiki/Artificial_intelligence`
@@ -24,16 +26,19 @@
 4. ✅ You should see: "Success! URL: [url], Chunks: X"
 
 ### Test 3: Upload CSV
-1. Click "Upload File" tab  
+
+1. Click "Upload File" tab
 2. Upload `test-data.csv`
 3. ✅ Each row becomes a searchable document
 
 ### Test 4: Upload JSON
+
 1. Click "Upload File" tab
 2. Upload `test-data.json`
 3. ✅ JSON properties/arrays become documents
 
 ### Test 5: Query Combined Sources
+
 1. After uploading multiple sources:
    - PDF about JavaScript
    - Wikipedia article on AI
@@ -46,6 +51,7 @@
 3. ✅ Results should come from ALL sources
 
 ### Test 6: AI Answers
+
 1. Check the "🤖 AI Answer" checkbox
 2. Ask: "Explain the main concepts from these documents"
 3. ✅ Google Gemini should generate a comprehensive answer
@@ -53,6 +59,7 @@
 ## 📊 What to Look For
 
 ### Successful Upload
+
 ```
 ✓ Success!
 File: test-data.csv
@@ -62,6 +69,7 @@ Total Chunks in DB: 94
 ```
 
 ### Successful URL Load
+
 ```
 ✓ Success!
 URL: https://en.wikipedia.org/wiki/Artificial_intelligence
@@ -70,12 +78,14 @@ Total Chunks in DB: 139
 ```
 
 ### Query Results
+
 - Should show similarity scores (0.0 to 1.0)
 - Higher scores = more relevant
 - Multiple sources should appear
 - Source information should indicate file type
 
 ### AI Answer
+
 - Coherent summary of relevant content
 - Cites sources from multiple documents
 - Powered by Google Gemini 2.5 Flash
@@ -83,21 +93,25 @@ Total Chunks in DB: 139
 ## 🐛 Troubleshooting
 
 ### URL Loading Fails
+
 - ✅ Check URL is public (not behind login)
 - ✅ Try simpler URLs first (Wikipedia works great)
 - ✅ Check internet connection
 - ✅ Playwright may need time to load page
 
 ### CSV Not Processing
+
 - ✅ Ensure CSV has headers
 - ✅ Check file is valid CSV format
 - ✅ UTF-8 encoding recommended
 
 ### JSON Not Loading
+
 - ✅ Validate JSON syntax (use jsonlint.com)
 - ✅ Check file is not too large (< 10MB)
 
 ### No Results When Querying
+
 - ✅ Check documents were uploaded (see stats)
 - ✅ Try broader query terms
 - ✅ Verify embeddings were created
@@ -105,6 +119,7 @@ Total Chunks in DB: 139
 ## 🎨 Expected Behavior
 
 ### File Icons
+
 - 📄 PDF files
 - 📊 CSV files
 - 📋 JSON files
@@ -112,11 +127,13 @@ Total Chunks in DB: 139
 - 🌐 Web URLs
 
 ### Stats Panel
+
 - Documents count updates
 - Chunks count increases
 - Shows 384D vector size
 
 ### Processed Sources List
+
 - Shows all uploaded files and URLs
 - Different icons for different types
 - URLs show full address
@@ -150,13 +167,14 @@ After loading mixed sources:
 ✅ Can query across all source types  
 ✅ AI answers integrate all sources  
 ✅ No errors in console  
-✅ Stats update correctly  
+✅ Stats update correctly
 
 ---
 
 **Happy Testing! 🚀**
 
 If you encounter issues, check:
+
 - Browser console (F12)
 - Server terminal output
 - Network tab in DevTools

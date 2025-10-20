@@ -121,7 +121,7 @@ function displayFilesList(files) {
         const fileName = typeof file === 'string' ? file : file.name;
         const fileType = typeof file === 'string' ? 'file' : file.type;
         const icon = fileType === 'url' ? '🌐' : getFileIcon(fileName);
-        
+
         return `
             <div class="file-item">
                 <div class="file-icon">${icon}</div>
@@ -174,7 +174,7 @@ function handleDrop(e) {
 
     const file = e.dataTransfer.files[0];
     const validTypes = ['application/pdf', 'text/csv', 'application/json', 'text/plain', 'text/markdown'];
-    
+
     if (file && validTypes.includes(file.type)) {
         uploadFile(file);
     } else {

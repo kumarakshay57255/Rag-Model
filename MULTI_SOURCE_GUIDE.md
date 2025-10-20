@@ -17,6 +17,7 @@ This enhanced RAG system now supports multiple input sources:
 ### 1. Upload Files
 
 Click the **"Upload File"** tab and:
+
 - Drag & drop files into the upload area
 - Or click "Choose File" to browse
 - Supported formats: `.pdf`, `.csv`, `.json`, `.txt`, `.md`
@@ -24,6 +25,7 @@ Click the **"Upload File"** tab and:
 ### 2. Load Web Pages
 
 Click the **"Load URL"** tab and:
+
 - Enter a webpage URL (e.g., `https://example.com/article`)
 - Click "Load Webpage"
 - The system will scrape the content and create embeddings
@@ -58,12 +60,15 @@ The system uses LangChain's specialized loaders:
 ## 📡 API Endpoints
 
 ### POST /api/upload
+
 Upload and process files (PDF, CSV, JSON, TXT, MD)
 
 **Request:**
+
 - FormData with file
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -76,9 +81,11 @@ Upload and process files (PDF, CSV, JSON, TXT, MD)
 ```
 
 ### POST /api/process-url
+
 Load and process webpage content
 
 **Request:**
+
 ```json
 {
   "url": "https://example.com/article"
@@ -86,6 +93,7 @@ Load and process webpage content
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -98,6 +106,7 @@ Load and process webpage content
 ## 🎨 Examples
 
 ### Loading a Wikipedia Article
+
 ```javascript
 // Frontend
 const url = "https://en.wikipedia.org/wiki/Machine_learning";
@@ -105,15 +114,17 @@ await processUrl(url);
 ```
 
 ### Uploading CSV Data
+
 ```javascript
 // Upload a CSV file with customer data
 // Each row becomes a searchable document
 ```
 
 ### Querying Combined Sources
+
 ```text
 Query: "What are the main concepts of machine learning?"
-Sources: 
+Sources:
 - Wikipedia article (web)
 - ML textbook.pdf (file)
 - research_notes.csv (file)
@@ -152,6 +163,7 @@ npx playwright install
 ## 🚀 Quick Start
 
 1. Start the server:
+
 ```bash
 node server.js
 ```
@@ -167,24 +179,26 @@ node server.js
 ## 🎓 Advanced Features
 
 ### Custom Chunk Sizes
+
 Edit `documentLoaders.js` to adjust chunking:
+
 ```javascript
 await splitDocuments(docs, 1500, 300); // Larger chunks
 ```
 
 ### Multiple URLs at Once
+
 Process multiple webpages:
+
 ```javascript
-const urls = [
-  "https://example.com/page1",
-  "https://example.com/page2"
-];
+const urls = ["https://example.com/page1", "https://example.com/page2"];
 for (const url of urls) {
   await processUrl(url);
 }
 ```
 
 ### CSV with Custom Columns
+
 CSV loader automatically handles all columns as metadata.
 
 ---
