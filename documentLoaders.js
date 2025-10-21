@@ -1,7 +1,10 @@
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
+import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 import path from 'path';
 import fs from 'fs';
 
@@ -17,25 +20,119 @@ export async function loadPDF(filePath) {
 }
 
 /**
- * Load documents from a website URL using Playwright
+ * Advanced web scraper with multiple fallback methods
  */
 export async function loadWebPage(url) {
     console.log(`🌐 Loading webpage: ${url}`);
-    const loader = new PlaywrightWebBaseLoader(url, {
-        launchOptions: {
-            headless: true,
-        },
-        gotoOptions: {
-            waitUntil: "domcontentloaded",
-        },
-        evaluateOptions: {
-            waitForSelector: "body",
+    
+    // Method 1: Try Cheerio (fastest, works for most sites)
+    try {
+        console.log('  Trying Cheerio scraper...');
+        const loader = new CheerioWebBaseLoader(url);
+        const docs = await loader.load();
+        if (docs && docs.length > 0 && docs[0].pageContent.trim().length > 100) {
+            console.log(`✓ Loaded content from ${url} using Cheerio`);
+            return docs;
         }
-    });
+    } catch (error) {
+        console.log('  Cheerio failed, trying next method...');
+    }
 
-    const docs = await loader.load();
-    console.log(`✓ Loaded content from ${url}`);
-    return docs;
+    // Method 2: Try Axios + Custom Cheerio parsing (more control)
+    try {
+        console.log('  Trying Axios + Cheerio...');
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            },
+            timeout: 15000,
+        });
+
+        const $ = cheerio.load(response.data);
+        
+        // Remove unwanted elements
+        $('script').remove();
+        $('style').remove();
+        $('nav').remove();
+        $('footer').remove();
+        $('header').remove();
+        $('.advertisement').remove();
+        $('#cookie-banner').remove();
+        
+        // Extract main content with priority
+        let content = '';
+        
+        // Try common content containers
+        const contentSelectors = [
+            'article',
+            'main',
+            '[role="main"]',
+            '.content',
+            '.main-content',
+            '#content',
+            '#main',
+            '.post-content',
+            '.entry-content',
+            'body'
+        ];
+        
+        for (const selector of contentSelectors) {
+            const element = $(selector);
+            if (element.length > 0) {
+                content = element.text();
+                if (content.trim().length > 100) {
+                    break;
+                }
+            }
+        }
+        
+        // Extract title
+        const title = $('title').text() || $('h1').first().text() || 'Untitled';
+        
+        // Clean up whitespace
+        content = content.replace(/\s+/g, ' ').trim();
+        
+        if (content.length > 100) {
+            console.log(`✓ Loaded content from ${url} using Axios (${content.length} chars)`);
+            return [{
+                pageContent: content,
+                metadata: {
+                    source: url,
+                    title: title.trim(),
+                    sourceType: 'url',
+                    scrapedAt: new Date().toISOString(),
+                }
+            }];
+        }
+    } catch (error) {
+        console.log('  Axios failed, trying next method...');
+    }
+
+    // Method 3: Fallback to Playwright (slower but handles JavaScript)
+    try {
+        console.log('  Trying Playwright (JS-enabled scraper)...');
+        const loader = new PlaywrightWebBaseLoader(url, {
+            launchOptions: {
+                headless: true,
+            },
+            gotoOptions: {
+                waitUntil: "networkidle",
+                timeout: 30000,
+            },
+            evaluateOptions: {
+                waitForSelector: "body",
+            }
+        });
+
+        const docs = await loader.load();
+        console.log(`✓ Loaded content from ${url} using Playwright`);
+        return docs;
+    } catch (error) {
+        console.log('  Playwright failed');
+        throw new Error(`Failed to scrape ${url} with all methods. Error: ${error.message}`);
+    }
 }
 
 /**

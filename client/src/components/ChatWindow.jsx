@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Upload, Globe, FileText, Database } from 'lucide-react';
+import { Send, Bot, User, Upload, Globe, FileText, Database, Trash2 } from 'lucide-react';
 import './ChatWindow.css';
 
 const ChatWindow = () => {
@@ -14,10 +14,11 @@ const ChatWindow = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState({ totalDocuments: 0, totalChunks: 0 });
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const API_BASE = 'http://localhost:3000/api';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -224,6 +225,33 @@ ${failCount > 0 ? `❌ Failed: ${failCount}` : ''}
     }
   };
 
+  const handleClearDatabase = async () => {
+    setShowClearConfirm(false);
+    setIsLoading(true);
+    
+    try {
+      addMessage('system', '🗑️ Clearing database...');
+      
+      const response = await fetch(`${API_BASE}/clear`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        addMessage('system', '✅ Database cleared successfully!\n📊 All documents and embeddings have been removed.');
+        setStats({ totalDocuments: 0, totalChunks: 0 });
+        loadStats(); // Refresh stats
+      } else {
+        throw new Error(data.error || 'Failed to clear database');
+      }
+    } catch (error) {
+      addMessage('bot', `❌ Error clearing database: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderMessage = (message) => {
     const isBot = message.type === 'bot';
     const isSystem = message.type === 'system';
@@ -276,6 +304,14 @@ ${failCount > 0 ? `❌ Failed: ${failCount}` : ''}
           >
             <Upload size={20} />
           </button>
+          <button 
+            className="icon-button danger" 
+            onClick={() => setShowClearConfirm(true)}
+            title="Clear database"
+            disabled={stats.totalChunks === 0}
+          >
+            <Trash2 size={20} />
+          </button>
           <input
             ref={fileInputRef}
             type="file"
@@ -285,6 +321,35 @@ ${failCount > 0 ? `❌ Failed: ${failCount}` : ''}
           />
         </div>
       </div>
+
+      {/* Clear Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>⚠️ Clear Database?</h2>
+            <p>
+              This will permanently delete all {stats.totalChunks} chunks from {stats.totalDocuments} sources.
+            </p>
+            <p className="warning-text">
+              ⚠️ This action cannot be undone!
+            </p>
+            <div className="modal-actions">
+              <button 
+                className="modal-button cancel" 
+                onClick={() => setShowClearConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-button confirm" 
+                onClick={handleClearDatabase}
+              >
+                Yes, Clear Database
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="messages-container">

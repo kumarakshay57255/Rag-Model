@@ -10,13 +10,21 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadWebPage, loadCSV, loadJSON, loadTextFile, splitDocuments } from './documentLoaders.js';
+import { 
+    initMilvusClient, 
+    createCollection, 
+    insertEmbeddings, 
+    searchSimilar, 
+    getStats as getMilvusStats, 
+    clearCollection 
+} from './milvusUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Express app
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -96,34 +104,21 @@ async function getEmbeddingModel() {
     return embeddingModel;
 }
 
-// Load vector store
-function loadVectorStore() {
-    const vectorStoreFile = './vector_store/embeddings.json';
-    if (!fs.existsSync(vectorStoreFile)) {
-        return null;
+// Initialize Milvus on startup
+async function initializeDatabase() {
+    try {
+        console.log('Initializing Milvus database...');
+        await initMilvusClient();
+        await createCollection();
+        console.log('✓ Milvus database ready');
+    } catch (error) {
+        console.error('⚠️  Milvus initialization failed:', error.message);
+        console.log('💡 Make sure Milvus is running: docker run -d --name milvus -p 19530:19530 milvusdb/milvus:latest');
     }
-    return JSON.parse(fs.readFileSync(vectorStoreFile, 'utf-8'));
 }
 
-// Save vector store
-function saveVectorStore(data) {
-    const vectorStoreDir = './vector_store';
-    if (!fs.existsSync(vectorStoreDir)) {
-        fs.mkdirSync(vectorStoreDir, { recursive: true });
-    }
-    fs.writeFileSync(
-        path.join(vectorStoreDir, 'embeddings.json'),
-        JSON.stringify(data, null, 2)
-    );
-}
-
-// Cosine similarity
-function cosineSimilarity(vecA, vecB) {
-    const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-    const magnitudeA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
-    const magnitudeB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
-    return dotProduct / (magnitudeA * magnitudeB);
-}
+// Initialize on startup
+initializeDatabase();
 
 // ============= API ROUTES =============
 
@@ -133,26 +128,12 @@ app.get('/', (req, res) => {
 });
 
 // Get vector store stats
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
     try {
-        const vectorStore = loadVectorStore();
-        if (!vectorStore) {
-            return res.json({
-                totalDocuments: 0,
-                totalChunks: 0,
-                files: []
-            });
-        }
-
-        res.json({
-            totalDocuments: vectorStore.metadata.sourceFiles.length,
-            totalChunks: vectorStore.metadata.totalChunks,
-            dimensions: vectorStore.metadata.dimensions,
-            model: vectorStore.metadata.model,
-            createdAt: vectorStore.metadata.createdAt,
-            files: vectorStore.metadata.sourceFiles
-        });
+        const stats = await getMilvusStats();
+        res.json(stats);
     } catch (error) {
+        console.error('Stats error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -221,33 +202,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         }
         console.log(`✓ Created embeddings for ${documentEmbeddings.length} chunks`);
 
-        // Load existing vector store or create new one
-        let vectorStore = loadVectorStore();
-        if (!vectorStore) {
-            vectorStore = {
-                embeddings: [],
-                metadata: {
-                    totalChunks: 0,
-                    dimensions: 384,
-                    model: 'Xenova/all-MiniLM-L6-v2',
-                    createdAt: new Date().toISOString(),
-                    sourceFiles: []
-                }
-            };
-        }
+        // Insert into Milvus
+        await insertEmbeddings(documentEmbeddings);
 
-        // Add new embeddings
-        vectorStore.embeddings.push(...documentEmbeddings);
-        vectorStore.metadata.totalChunks = vectorStore.embeddings.length;
-        vectorStore.metadata.sourceFiles.push({
-            name: req.file.originalname,
-            type: fileExtension,
-            uploadedAt: new Date().toISOString()
-        });
-
-        // Save vector store
-        saveVectorStore(vectorStore);
-        console.log(`✓ Vector store updated`);
+        // Get updated stats
+        const stats = await getMilvusStats();
 
         res.json({
             success: true,
@@ -256,7 +215,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             fileType: fileExtension,
             documents: docs.length,
             chunks: splitDocs.length,
-            totalChunks: vectorStore.metadata.totalChunks
+            totalChunks: stats.totalChunks
         });
 
     } catch (error) {
@@ -313,40 +272,18 @@ app.post('/api/process-url', async (req, res) => {
         }
         console.log(`✓ Created embeddings for ${documentEmbeddings.length} chunks`);
 
-        // Load existing vector store or create new one
-        let vectorStore = loadVectorStore();
-        if (!vectorStore) {
-            vectorStore = {
-                embeddings: [],
-                metadata: {
-                    totalChunks: 0,
-                    dimensions: 384,
-                    model: 'Xenova/all-MiniLM-L6-v2',
-                    createdAt: new Date().toISOString(),
-                    sourceFiles: []
-                }
-            };
-        }
+        // Insert into Milvus
+        await insertEmbeddings(documentEmbeddings);
 
-        // Add new embeddings
-        vectorStore.embeddings.push(...documentEmbeddings);
-        vectorStore.metadata.totalChunks = vectorStore.embeddings.length;
-        vectorStore.metadata.sourceFiles.push({
-            name: url,
-            type: 'url',
-            uploadedAt: new Date().toISOString()
-        });
-
-        // Save vector store
-        saveVectorStore(vectorStore);
-        console.log(`✓ Vector store updated`);
+        // Get updated stats
+        const stats = await getMilvusStats();
 
         res.json({
             success: true,
             message: 'URL processed successfully',
             url: url,
             chunks: splitDocs.length,
-            totalChunks: vectorStore.metadata.totalChunks
+            totalChunks: stats.totalChunks
         });
 
     } catch (error) {
@@ -364,9 +301,9 @@ app.post('/api/query', async (req, res) => {
             return res.status(400).json({ error: 'Query is required' });
         }
 
-        // Load vector store
-        const vectorStore = loadVectorStore();
-        if (!vectorStore || vectorStore.embeddings.length === 0) {
+        // Check if there are any documents
+        const stats = await getMilvusStats();
+        if (stats.totalChunks === 0) {
             return res.json({
                 query: query,
                 results: [],
@@ -383,32 +320,20 @@ app.post('/api/query', async (req, res) => {
         const queryOutput = await model(query, { pooling: 'mean', normalize: true });
         const queryEmbedding = Array.from(queryOutput.data);
 
-        // Calculate similarities
-        const similarities = vectorStore.embeddings.map(doc => ({
-            content: doc.content,
-            metadata: doc.metadata,
-            chunkIndex: doc.chunkIndex,
-            similarity: cosineSimilarity(queryEmbedding, doc.embedding)
-        }));
+        // Search in Milvus
+        const results = await searchSimilar(queryEmbedding, topK);
 
-        // Sort by similarity
-        similarities.sort((a, b) => b.similarity - a.similarity);
-
-        // Get top K results
-        const topResults = similarities.slice(0, topK);
-
-        console.log(`✓ Found ${topResults.length} results`);
+        console.log(`✓ Found ${results.length} results`);
 
         res.json({
             query: query,
-            results: topResults.map(r => ({
+            results: results.map(r => ({
                 content: r.content,
-                source: r.metadata.originalName || r.metadata.source,
-                page: r.metadata.loc?.pageNumber || 'N/A',
+                source: r.source,
                 similarity: (r.similarity * 100).toFixed(2),
                 chunkIndex: r.chunkIndex
             })),
-            totalDocuments: vectorStore.metadata.sourceFiles.length
+            totalDocuments: stats.totalDocuments
         });
 
     } catch (error) {
@@ -433,13 +358,13 @@ app.post('/api/query-ai', async (req, res) => {
             });
         }
 
-        // Load vector store
-        const vectorStore = loadVectorStore();
-        if (!vectorStore || vectorStore.embeddings.length === 0) {
+        // Check if there are any documents
+        const stats = await getMilvusStats();
+        if (stats.totalChunks === 0) {
             return res.json({
                 query: query,
                 answer: 'No documents in vector store. Please upload some documents first.',
-                results: []
+                sources: []
             });
         }
 
@@ -452,24 +377,13 @@ app.post('/api/query-ai', async (req, res) => {
         const queryOutput = await model(query, { pooling: 'mean', normalize: true });
         const queryEmbedding = Array.from(queryOutput.data);
 
-        // Calculate similarities
-        const similarities = vectorStore.embeddings.map(doc => ({
-            content: doc.content,
-            metadata: doc.metadata,
-            chunkIndex: doc.chunkIndex,
-            similarity: cosineSimilarity(queryEmbedding, doc.embedding)
-        }));
+        // Search in Milvus
+        const results = await searchSimilar(queryEmbedding, topK);
 
-        // Sort by similarity
-        similarities.sort((a, b) => b.similarity - a.similarity);
-
-        // Get top K results
-        const topResults = similarities.slice(0, topK);
-
-        console.log(`✓ Retrieved ${topResults.length} relevant chunks`);
+        console.log(`✓ Retrieved ${results.length} relevant chunks`);
 
         // Prepare context for Gemini
-        const context = topResults
+        const context = results
             .map((doc, index) => `[Document ${index + 1}] ${doc.content}`)
             .join('\n\n');
 
@@ -495,17 +409,19 @@ Answer:`;
 
         console.log('✓ AI answer generated');
 
+        // Get current stats for response
+        const currentStats = await getMilvusStats();
+
         res.json({
             query: query,
             answer: answer,
-            results: topResults.map(r => ({
+            sources: results.map(r => ({
                 content: r.content,
-                source: r.metadata.originalName || r.metadata.source,
-                page: r.metadata.loc?.pageNumber || 'N/A',
-                similarity: (r.similarity * 100).toFixed(2),
+                source: r.source,
+                similarity: r.similarity,
                 chunkIndex: r.chunkIndex
             })),
-            totalDocuments: vectorStore.metadata.sourceFiles.length,
+            totalDocuments: currentStats.totalDocuments,
             model: 'Google Gemini 2.5 Flash'
         });
 
@@ -516,12 +432,10 @@ Answer:`;
 });
 
 // Clear vector store
-app.delete('/api/clear', (req, res) => {
+app.delete('/api/clear', async (req, res) => {
     try {
-        const vectorStoreFile = './vector_store/embeddings.json';
-        if (fs.existsSync(vectorStoreFile)) {
-            fs.unlinkSync(vectorStoreFile);
-        }
+        // Clear Milvus collection
+        await clearCollection();
 
         // Also clear uploads
         const uploadDir = './uploads';
@@ -534,6 +448,7 @@ app.delete('/api/clear', (req, res) => {
 
         res.json({ success: true, message: 'Vector store cleared' });
     } catch (error) {
+        console.error('Clear error:', error);
         res.status(500).json({ error: error.message });
     }
 });
